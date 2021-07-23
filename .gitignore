@@ -1,0 +1,5 @@
+.ipynb_checkpoints
+__pycache__
+newsData/.
+tokens.txt
+tokensw2v.txt

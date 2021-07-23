@@ -52,9 +52,8 @@ class ArticleAttribute():
                     start = startMonth
                 elif year == endYear:
                     end = endMonth
-            
-            for month in range(start,end+1):
-                for day in range(1,calendar.monthrange(year,month)[1]+1):
+            for month in tqdm(range(start,end+1),desc="Month Iteration"):
+                for day in tqdm(range(1,calendar.monthrange(year,month)[1]+1),desc="Day Iteration"):
                     if len(str(month)) == 1:
                         month = '0' + str(month)
                     if len(str(day)) == 1:
@@ -82,10 +81,11 @@ class ArticleAttribute():
 
     @staticmethod
     def getURLdata(url, max_tries=10):
+        header = {"User-Agent": "Mozilla/5.0 (Window NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36"}
         remaining_tries = int(max_tries)
         while remaining_tries > 0:
             try:
-                return requests.get(url)
+                return requests.get(url, headers=header)
             except:
                 time.sleep(60)
             remaining_tries = remaining_tries - 1
@@ -141,11 +141,7 @@ class ArticleAttribute():
                     except OSError:
                         print("폴더 생성에 실패했습니다.")
 
-                    print(os.getcwd())
-
-
                     fileName = self.DATA_DIR+'/'+str(self.categoriesFolder.get(categoryName))+'/'+categoryName+str(number)+".txt"
-                    print(fileName)
                     self.fileWrite(fileName,title,content)
                     number+=1
 
