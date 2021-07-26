@@ -24,7 +24,7 @@ class NewsParser(object):
             regex = re.compile(r'<strong>(?P<num>\d+)')
             match = regex.findall(str(headline_tag))
             return int(match[0])
-        except Exception as e:
+        except Exception:
             return 0
 
     @classmethod

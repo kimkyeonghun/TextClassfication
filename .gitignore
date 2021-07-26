@@ -1,5 +1,9 @@
 .ipynb_checkpoints
 __pycache__
-newsData/.
+/newsData/
 tokens.txt
 tokensw2v.txt
+
+README_onlyme.md
+
+/webdriver/

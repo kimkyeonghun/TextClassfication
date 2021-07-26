@@ -1,31 +1,61 @@
-import os
-import re
-import time
+import argparse
 import calendar
-import requests
 from datetime import datetime
-from bs4 import BeautifulSoup
 from multiprocessing import Process
+import os
+import time
+from typing import List
+
+from bs4 import BeautifulSoup
+import requests
 from tqdm import tqdm
+
 from Exceptions import *
 from NewsParser import NewsParser
 
 
+parser = argparse.ArgumentParser()
+parser.add_argument('--startY', type=int, required=True)
+parser.add_argument('--startM', type=int, required=True)
+parser.add_argument('--endY', type=int, required=True)
+parser.add_argument('--endM', type=int, required=True)
+args = parser.parse_args()
+
+DATA_DIR='./newsData'
+
 class ArticleAttribute():
+    """
+    연예, 스포츠 기사 이외의 나머지 카테고리의 기사들을 BeautifulSoup로 Crawling
+
+    Args:
+        categoriesCode: 각 카테고리 페이지로 이동하기 위한 code
+        categoriesFolder: 각 카테고리 기사를 저장하기 위한 번호
+        selectedCategories: 실행중에 Crawling할 카테고리
+        date: crwaling할 범위 start YY.MM ~ end YY.MM
+
+    func:
+        set_category: self.selectedCategories를 채워넣음
+        set_date: self.date를 채워넣음
+        make_newsURL_form: 정해진 기간동안 모든 기사의 URL을 저장
+        file_write: 결과를 저장
+        get_URLdata: URL에 접근
+        crawling: 각 URL에 대해서 BeautifulSoup로 크롤링 진행
+        start: crawling 함수 호출
+    
+    """
     def __init__(self):
-        self.categoriesCode = {"정치":100,"경제":101,"사회":102,"생활문화":103,"세계":104,"IT과학":105}
-        self.categoriesFolder = {"정치":0,"경제":1,"사회":2,"생활문화":3,"세계":4,"IT과학":5}
-        self.selectedCategories = []
-        self.date = {'startYear': 0, 'startMonth': 0, 'endYear': 0, 'endMonth': 0}
-        self.DATA_DIR='./newsData'
-        
-    def setCategory(self,*args):
+        self.categoriesCode: dict = {"정치":100,"경제":101,"사회":102,"생활문화":103,"세계":104,"IT과학":105}
+        self.categoriesFolder: dict = {"정치":0,"경제":1,"사회":2,"생활문화":3,"세계":4,"IT과학":5}
+        self.selectedCategories: list = []
+        self.date: dict = {'startYear': 0, 'startMonth': 0, 'endYear': 0, 'endMonth': 0}
+
+    def set_category(self,*args):
         for key in args:
             if self.categoriesCode.get(key) is None:
                 raise InvalidCategory
         self.selectedCategories = args
 
-    def setDate(self,startYear,startMonth,endYear,endMonth):
+    def set_date(self,startYear: int, startMonth: int, endYear: int, endMonth:int):
         args = [startYear, startMonth, endYear, endMonth]
         if startYear > endYear:
             raise OverFlowYear
@@ -40,20 +70,20 @@ class ArticleAttribute():
             self.date[key] = date
 
     @staticmethod
-    def makeNewsURLForm(NewsURL, startYear, endYear, startMonth, endMonth):
+    def make_newsURL_form(NewsURL: str, start_year: int, end_year: int, start_month: int, end_month: int)-> List[str]:
         madeURL=[]
         start, end = 1, 12 
-        for year in range(startYear,endYear+1):
-            if startYear == endYear:
-                start = startMonth
-                end = endMonth
+        for year in range(start_year, end_year + 1):
+            if start_year == end_year:
+                start = start_month
+                end = end_month
             else:
-                if year == startYear:
-                    start = startMonth
-                elif year == endYear:
-                    end = endMonth
-            for month in tqdm(range(start,end+1),desc="Month Iteration"):
-                for day in tqdm(range(1,calendar.monthrange(year,month)[1]+1),desc="Day Iteration"):
+                if year == start_year:
+                    start = start_month
+                elif year == end_year:
+                    end = end_month
+            for month in tqdm(range(start, end + 1), desc = "Month Iteration"):
+                for day in tqdm(range(1, calendar.monthrange(year,month)[1] + 1), desc = "Day Iteration"):
                     if len(str(month)) == 1:
                         month = '0' + str(month)
                     if len(str(day)) == 1:
@@ -70,7 +100,7 @@ class ArticleAttribute():
         return madeURL
 
     @classmethod
-    def fileWrite(self,fileName,title,content):
+    def file_write(self, fileName:str, title: str, content: list):
         f = open(fileName,'w')
         f.write(title)
         f.write("\n")
@@ -80,7 +110,7 @@ class ArticleAttribute():
         f.close()
 
     @staticmethod
-    def getURLdata(url, max_tries=10):
+    def get_URLdata(url: str, max_tries=10):
         header = {"User-Agent": "Mozilla/5.0 (Window NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36"}
         remaining_tries = int(max_tries)
         while remaining_tries > 0:
@@ -91,16 +121,16 @@ class ArticleAttribute():
             remaining_tries = remaining_tries - 1
         raise ResponseTimeout
 
-    def crawling(self,categoryName):
+    def crawling(self, categoryName: str):
         print(str(os.getpid())+" : "+categoryName+"\n")
         url= "http://news.naver.com/main/list.nhn?mode=LSD&mid=shm&sid1=" + str(self.categoriesCode.get(categoryName)) + "&date="
-        urls = self.makeNewsURLForm(url, self.date['startYear'], self.date['endYear'], self.date['startMonth'], self.date['endMonth']) 
+        urls = self.make_newsURL_form(url, self.date['startYear'], self.date['endYear'], self.date['startMonth'], self.date['endMonth']) 
         number=0
 
         print("Crawling Start!")
         for url in urls:
             print(str(os.getpid())+" : "+url)
-            pageHtml = self.getURLdata(url)
+            pageHtml = self.get_URLdata(url)
             document = BeautifulSoup(pageHtml.content,'html.parser')
 
             #가운데의 줄을 기준으로 headline과 일반으로 나누어져 있음
@@ -117,7 +147,7 @@ class ArticleAttribute():
                 time.sleep(0.01)
                 
                 # 기사 HTML 가져옴
-                contentHtml = self.getURLdata(contentURL)
+                contentHtml = self.get_URLdata(contentURL)
                 documentContent = BeautifulSoup(contentHtml.content, 'html.parser')
                 
                 try:
@@ -135,14 +165,14 @@ class ArticleAttribute():
                         continue
 
                     try:
-                        if not(os.path.isdir(os.path.join(self.DATA_DIR,str(self.categoriesFolder.get(categoryName))))):
-                            os.makedirs(os.path.join(self.DATA_DIR,str(self.categoriesFolder.get(categoryName))))
+                        if not(os.path.isdir(os.path.join(DATA_DIR,str(self.categoriesFolder.get(categoryName))))):
+                            os.makedirs(os.path.join(DATA_DIR,str(self.categoriesFolder.get(categoryName))))
                             print("폴더 생성")
                     except OSError:
                         print("폴더 생성에 실패했습니다.")
 
-                    fileName = self.DATA_DIR+'/'+str(self.categoriesFolder.get(categoryName))+'/'+categoryName+str(number)+".txt"
-                    self.fileWrite(fileName,title,content)
+                    fileName = DATA_DIR+'/'+str(self.categoriesFolder.get(categoryName))+'/'+categoryName+str(number)+".txt"
+                    self.file_write(fileName,title,content)
                     number+=1
 
                     del content, title
@@ -162,6 +192,6 @@ class ArticleAttribute():
 
 if __name__ == "__main__":
     Crawler = ArticleAttribute()
-    Crawler.setCategory("정치","경제")
-    Crawler.setDate(2019, 11, 2019, 11)
+    Crawler.set_category("정치","경제")
+    Crawler.set_date(args.startY, args.startM, args.endY, args.endM)
     Crawler.start()

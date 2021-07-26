@@ -102,7 +102,7 @@ class EntertainAttribute():
             options =webdriver.ChromeOptions()
             options.add_argument('headless')
             options.add_argument('disable-gpu')
-            options.add_argument('--start-maximized')
+            #options.add_argument('--start-maximized')
             driver=webdriver.Chrome(self.driverPATH,chrome_options=options)
             end=True
             while end:
