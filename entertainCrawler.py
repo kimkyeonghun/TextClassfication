@@ -1,29 +1,38 @@
-import os
-import re
-import time
+import argparse
 import calendar
-import requests
 from datetime import datetime
-from bs4 import BeautifulSoup
+import os
 from multiprocessing import Process
+import time
+from typing import List
+
+from bs4 import BeautifulSoup
+import requests
+from selenium import webdriver
 from tqdm import tqdm
+
 from Exceptions import *
 from NewsParser import NewsParser
-from selenium import webdriver
 
+parser = argparse.ArgumentParser()
+parser.add_argument('--startY', type=int, required=True)
+parser.add_argument('--startM', type=int, required=True)
+parser.add_argument('--endY', type=int, required=True)
+parser.add_argument('--endM', type=int, required=True)
+args = parser.parse_args()
+
+DATA_DIR = './newsData/6'
+
+DRIVER_PATH='./webdriver/chrome/chromedriver.exe'
 
 class EntertainAttribute():
     number = 0
     def __init__(self):
-        self.categoryCode = {"연예":106}
-        self.categoriesFolder = {"연예":6}
-        self.selectedCategories = []
+        self.category_code = {"연예" : 106}
+        self.selected_categories = []
         self.date = {'startYear': 0, 'startMonth': 0, 'endYear': 0, 'endMonth': 0}
-        self.DATA_DIR='./newsData/6'
-        self.driverPATH='./webdriver/chrome/chromedriver.exe'
-        
 
-    def setDate(self,startYear,startMonth,endYear,endMonth):
+    def set_date(self, startYear: int, startMonth: int, endYear: int, endMonth: int):
         args = [startYear, startMonth, endYear, endMonth]
         if startYear > endYear:
             raise OverFlowYear
@@ -37,18 +46,25 @@ class EntertainAttribute():
         for key,date in zip(self.date,args):
             self.date[key] = date
     
-    def setCategory(self,*args):
+    def set_category(self,*args):
         for key in args:
-            if self.categoryCode.get(key) is None:
+            if self.category_code.get(key) is None:
                 raise InvalidCategory
-        self.selectedCategories = args
-    
+        self.selected_categories = args
+
+    def set_driver_option(self):
+        options = webdriver.ChromeOptions()
+        options.add_argument('headless')
+        options.add_argument('disable-gpu')
+            #options.add_argument('--start-maximized')
+        driver = webdriver.Chrome(DRIVER_PATH, chrome_options = options)
+        return driver
 
     @staticmethod
-    def makeNewsURLForm(NewsURL, startYear, endYear, startMonth, endMonth):
+    def make_newsURL_form(NewsURL: str, startYear: int, endYear: int, startMonth: int, endMonth: int) -> List[str]:
         madeURL=[]
         start, end = 1, 12 
-        for year in range(startYear,endYear+1):
+        for year in range(startYear, endYear + 1):
             if startYear == endYear:
                 start = startMonth
                 end = endMonth
@@ -58,8 +74,8 @@ class EntertainAttribute():
                 elif year == endYear:
                     end = endMonth
             
-            for month in range(start,end+1):
-                for day in range(1,calendar.monthrange(year,month)[1]+1):
+            for month in tqdm(range(start, end + 1), desc = "Month Iteration"):
+                for day in tqdm(range(1, calendar.monthrange(year, month)[1] + 1), desc = "Day Iteration"):
                     if len(str(month)) == 1:
                         month = '0' + str(month)
                     if len(str(day)) == 1:
@@ -74,17 +90,18 @@ class EntertainAttribute():
         return madeURL
 
     @classmethod
-    def fileWrite(self,fileName,title,content):
-        f = open(fileName,'w')
+    def file_write(self, file_name: str, title: str, content: list):
+        f = open(file_name,'w')
         f.write(title)
         f.write("\n")
+        
         for c in content:
             f.write(c)
             f.write("\n")
         f.close()
 
     @staticmethod
-    def getURLdata(url, max_tries=10):
+    def get_URLdata(url: str, max_tries=10):
         remaining_tries = int(max_tries)
         while remaining_tries > 0:
             try:
@@ -95,83 +112,80 @@ class EntertainAttribute():
         raise ResponseTimeout
 
 
-    def crawling(self,parseURLs):
+    def crawling(self, parse_URLs: str):
         print("Crawling Start!")
-        for url in parseURLs:
+        for url in parse_URLs:
             pageN=1
-            options =webdriver.ChromeOptions()
-            options.add_argument('headless')
-            options.add_argument('disable-gpu')
-            #options.add_argument('--start-maximized')
-            driver=webdriver.Chrome(self.driverPATH,chrome_options=options)
+            driver = self.set_driver_option()
             end=True
             while end:
                 articles=[]
                 driver.get(url+"&page="+str(pageN))
                 print(str(os.getpid())+":"+url+"&page="+str(pageN))
                 time.sleep(1.5)
-                pages=driver.find_elements_by_css_selector('#newsWrp > ul > li')
+                pages = driver.find_elements_by_css_selector('#newsWrp > ul > li')
                 try:
                     for page in pages:
                         articles.append(page.find_element_by_css_selector('a').get_attribute('href'))
                     del pages
 
-                    for contentURL in articles:
+                    for content_URL in articles:
                         time.sleep(0.01)
 
-                        contentHtml = self.getURLdata(contentURL)
-                        documentContent = BeautifulSoup(contentHtml.content, 'html.parser')
+                        content_html = self.get_URLdata(content_URL)
+                        document_content = BeautifulSoup(content_html.content, 'html.parser')
 
                         try:
-                            articleTitle = documentContent.find_all('h2',{'class': 'end_tit'})
+                            article_title = document_content.find_all('h2', {'class': 'end_tit'})
                             title = ''
-                            title += NewsParser.clearHeadlineE(str(articleTitle[0].find_all(text=True)))
+                            title += NewsParser.clear_headlineE(str(article_title[0].find_all(text=True)))
                             if not title:
                                 continue
 
-                            articleBodyContents = documentContent.find_all("div",{"id":"articeBody"})
-                            content = NewsParser.clearContent(list(articleBodyContents[0].find_all(text=True)))
+                            article_body_contents = document_content.find_all("div", {"id": "articeBody"})
+                            content = NewsParser.clear_content(list(article_body_contents[0].find_all(text=True)))
                             if not content:
                                 continue
                                 
-                            fileName = self.DATA_DIR+'/'+str(os.getpid())+'_'+str(self.number)+".txt"
-                            self.fileWrite(fileName,title,content)
+                            file_name = DATA_DIR+'/'+str(os.getpid())+'_'+str(self.number)+".txt"
+                            self.file_write(file_name, title, content)
                             self.number += 1
 
                             del content, title
-                            del articleTitle, articleBodyContents
-                            del contentHtml, documentContent
+                            del article_title, article_body_contents
+                            del content_html, document_content
 
                         except Exception:
-                            del contentHtml, documentContent
+                            del content_html, document_content
                             pass
+
                     del articles
                 except:
-                    end=False
-                pageN+=1
-            driver.quit()
+                    end = False
+                pageN += 1
 
+            driver.quit()
 
     def start(self):
         try:
-            if not(os.path.isdir(self.DATA_DIR)):
-                os.makedirs(self.DATA_DIR)
+            if not(os.path.isdir(DATA_DIR)):
+                os.makedirs(DATA_DIR)
                 print("폴더 생성")
         except OSError:
             print("폴더 생성에 실패했습니다.")
         
-        for categoryName in self.selectedCategories:
-            url= "https://entertain.naver.com/now#sid=" + str(self.categoryCode.get(categoryName)) + "&date="
-            urls = self.makeNewsURLForm(url, self.date['startYear'], self.date['endYear'], self.date['startMonth'], self.date['endMonth'])
-            totalURLs=len(urls)
-            for i in range(0,totalURLs,10):
-                parseURLs = urls[i:i+10]
-                proc = Process(target=self.crawling, args=(parseURLs,))
+        for category_name in self.selected_categories:
+            url = "https://entertain.naver.com/now#sid=" + str(self.category_code.get(category_name)) + "&date="
+            urls = self.make_newsURL_form(url, self.date['startYear'], self.date['endYear'], self.date['startMonth'], self.date['endMonth'])
+            totalURLs = len(urls)
+            for i in range(0, totalURLs, 10):
+                parseURLs = urls[i: i + 10]
+                proc = Process(target = self.crawling, args = (parseURLs,))
                 proc.start()
 
 if __name__ == '__main__':
     Crawler = EntertainAttribute()
-    Crawler.setCategory("연예")
-    Crawler.setDate(2019, 7, 2019, 11)
+    Crawler.set_category("연예")
+    Crawler.set_date(args.startY, args.startM, args.endY, args.endM)
     Crawler.start()
 

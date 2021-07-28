@@ -41,7 +41,6 @@ class ArticleAttribute():
         get_URLdata: URL에 접근
         crawling: 각 URL에 대해서 BeautifulSoup로 크롤링 진행
         start: crawling 함수 호출
-    
     """
     def __init__(self):
         self.categoriesCode: dict = {"정치":100,"경제":101,"사회":102,"생활문화":103,"세계":104,"IT과학":105}
@@ -55,7 +54,7 @@ class ArticleAttribute():
                 raise InvalidCategory
         self.selectedCategories = args
 
-    def set_date(self,startYear: int, startMonth: int, endYear: int, endMonth:int):
+    def set_date(self, startYear: int, startMonth: int, endYear: int, endMonth:int):
         args = [startYear, startMonth, endYear, endMonth]
         if startYear > endYear:
             raise OverFlowYear
@@ -94,14 +93,14 @@ class ArticleAttribute():
                     url = NewsURL + str(year) + str(month) + str(day)
 
                     #끝페이지보다 더 큰 값을 이동하면 자동으로 마지막 페이지로 이동하게 된다.
-                    totalpage = NewsParser.findNewsTotalpage(url+'&page=10000')
+                    totalpage = NewsParser.find_news_total_page(url+'&page=10000')
                     for page in range(1,totalpage+1):
                         madeURL.append(url+'&page='+str(page))
         return madeURL
 
     @classmethod
-    def file_write(self, fileName:str, title: str, content: list):
-        f = open(fileName,'w')
+    def file_write(self, file_name:str, title: str, content: list):
+        f = open(file_name,'w')
         f.write(title)
         f.write("\n")
         for c in content:
@@ -121,17 +120,17 @@ class ArticleAttribute():
             remaining_tries = remaining_tries - 1
         raise ResponseTimeout
 
-    def crawling(self, categoryName: str):
-        print(str(os.getpid())+" : "+categoryName+"\n")
-        url= "http://news.naver.com/main/list.nhn?mode=LSD&mid=shm&sid1=" + str(self.categoriesCode.get(categoryName)) + "&date="
+    def crawling(self, category_name: str):
+        print(str(os.getpid())+" : "+category_name+"\n")
+        url= "http://news.naver.com/main/list.nhn?mode=LSD&mid=shm&sid1=" + str(self.categoriesCode.get(category_name)) + "&date="
         urls = self.make_newsURL_form(url, self.date['startYear'], self.date['endYear'], self.date['startMonth'], self.date['endMonth']) 
-        number=0
+        number = 0
 
         print("Crawling Start!")
         for url in urls:
             print(str(os.getpid())+" : "+url)
-            pageHtml = self.get_URLdata(url)
-            document = BeautifulSoup(pageHtml.content,'html.parser')
+            page_html = self.get_URLdata(url)
+            document = BeautifulSoup(page_html.content,'html.parser')
 
             #가운데의 줄을 기준으로 headline과 일반으로 나누어져 있음
             pages = document.select('.newsflash_body .type06_headline li dl')
@@ -142,51 +141,51 @@ class ArticleAttribute():
                 articles.append(line.a.get('href')) # 해당되는 page에서 모든 기사들의 URL을 post 리스트에 넣음
             del pages
 
-            for contentURL in tqdm(articles):  # 기사 URL
+            for content_URL in tqdm(articles):  # 기사 URL
                 # 크롤링 대기 시간
                 time.sleep(0.01)
                 
                 # 기사 HTML 가져옴
-                contentHtml = self.get_URLdata(contentURL)
-                documentContent = BeautifulSoup(contentHtml.content, 'html.parser')
+                content_html = self.get_URLdata(content_URL)
+                document_content = BeautifulSoup(content_html.content, 'html.parser')
                 
                 try:
                     # 기사 제목 가져옴
-                    articleTitle = documentContent.find_all('h3', {'id': 'articleTitle'}, {'class': 'tts_head'})
+                    article_title = document_content.find_all('h3', {'id': 'articleTitle'}, {'class': 'tts_head'})
                     title = ''  # 뉴스 기사 제목 초기화
-                    title += NewsParser.clearHeadline(str(articleTitle[0].find_all(text=True)))
+                    title += NewsParser.clear_headline(str(article_title[0].find_all(text=True)))
                     if not title:  # 공백일 경우 기사 제외 처리
                         continue
 
                     # 기사 본문 가져옴
-                    articleBodyContents = documentContent.find_all('div', {'id': 'articleBodyContents'})
-                    content = NewsParser.clearContent(list(articleBodyContents[0].find_all(text=True)))
+                    article_body_contents = document_content.find_all('div', {'id': 'articleBodyContents'})
+                    content = NewsParser.clear_content(list(article_body_contents[0].find_all(text=True)))
                     if not len(content):  # 공백일 경우 기사 제외 처리
                         continue
 
                     try:
-                        if not(os.path.isdir(os.path.join(DATA_DIR,str(self.categoriesFolder.get(categoryName))))):
-                            os.makedirs(os.path.join(DATA_DIR,str(self.categoriesFolder.get(categoryName))))
+                        if not(os.path.isdir(os.path.join(DATA_DIR, str(self.categoriesFolder.get(category_name))))):
+                            os.makedirs(os.path.join(DATA_DIR, str(self.categoriesFolder.get(category_name))))
                             print("폴더 생성")
                     except OSError:
                         print("폴더 생성에 실패했습니다.")
 
-                    fileName = DATA_DIR+'/'+str(self.categoriesFolder.get(categoryName))+'/'+categoryName+str(number)+".txt"
-                    self.file_write(fileName,title,content)
-                    number+=1
+                    file_name = DATA_DIR+'/' + str(self.categoriesFolder.get(category_name)) + '/'+category_name + str(number) + ".txt"
+                    self.file_write(file_name, title, content)
+                    number += 1
 
                     del content, title
-                    del articleTitle, articleBodyContents
-                    del contentHtml, documentContent
+                    del article_title, article_body_contents
+                    del content_html, document_content
 
                 except Exception:
-                    del contentHtml, documentContent
+                    del content_html, document_content
                     pass
 
     def start(self):
         # MultiProcess 크롤링
-        for categoryName in self.selectedCategories:
-            proc = Process(target=self.crawling, args=(categoryName,))
+        for category_name in self.selectedCategories:
+            proc = Process(target=self.crawling, args=(category_name,))
             proc.start()
 
 

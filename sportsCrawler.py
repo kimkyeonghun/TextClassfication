@@ -1,32 +1,44 @@
-import re
-import os
-import time
-import requests
+import argparse
 import calendar
 from datetime import datetime
-from bs4 import BeautifulSoup
-from tqdm import tqdm
-from Exceptions import *
+import os
 from multiprocessing import Process
-from NewsParser import NewsParser
+import time
+from tqdm import tqdm
+from typing import List
+
+from bs4 import BeautifulSoup
+import requests
 from selenium import webdriver
+
+from Exceptions import *
+from NewsParser import NewsParser
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--startY', type=int, required=True)
+parser.add_argument('--startM', type=int, required=True)
+parser.add_argument('--endY', type=int, required=True)
+parser.add_argument('--endM', type=int, required=True)
+args = parser.parse_args()
+
+DATA_DIR='./newsData/7'
+DRIVER_PATH='./webdriver/chrome/chromedriver.exe'
 
 class SportsAttribute():
     def __init__(self):
-        self.driverPath='./webdriver/chrome/chromedriver.exe'
-        self.categoryCode={"야구":"kbaseball",'해외야구':'wbaseball','축구':'kfootball','해외축구':'wfootball',
-        '농구':'basketball','배구':'volleyball','골프':'golf','일반':'general','e스포츠':'esports'}
-        self.selectedCategories=[]
+        #e스포츠는 url이 변경되었음
+        self.category_code={"야구": "kbaseball", '해외야구': 'wbaseball', '축구': 'kfootball', '해외축구': 'wfootball',
+        '농구': 'basketball', '배구': 'volleyball', '골프': 'golf', '일반': 'general', 'e스포츠': 'esports'}
+        self.selected_categories=[]
         self.date ={'startYear': 0, 'startMonth': 0, 'endYear': 0, 'endMonth': 0}
-        self.DATA_DIR='./newsData/7'
 
-    def setCategory(self,*args):
+    def set_category(self,*args):
         for key in args:
-            if self.categoryCode.get(key) is None:
+            if self.category_code.get(key) is None:
                 raise InvalidCategory
-        self.selectedCategories = args
+        self.selected_categories = args
     
-    def setDate(self,startYear,startMonth,endYear,endMonth):
+    def set_date(self, startYear: int, startMonth: int, endYear: int, endMonth: int):
         args = [startYear, startMonth, endYear, endMonth]
         if startYear > endYear:
             raise OverFlowYear
@@ -41,7 +53,7 @@ class SportsAttribute():
             self.date[key] = date
 
     @staticmethod
-    def makeNewsURLForm(NewsURL, startYear, endYear, startMonth, endMonth):
+    def make_newsURL_form(NewsURL, startYear: int, endYear: int, startMonth: int, endMonth: int) -> List[str]:
         madeURL=[]
         start, end = 1, 12 
         for year in range(startYear,endYear+1):
@@ -54,8 +66,8 @@ class SportsAttribute():
                 elif year == endYear:
                     end = endMonth
             
-            for month in range(start,end+1):
-                for day in range(1,calendar.monthrange(year,month)[1]+1):
+            for month in tqdm(range(start, end + 1), desc = "Month Iteration"):
+                for day in tqdm(range(1, calendar.monthrange(year, month)[1] + 1), desc = "Day Iteration"):
                     if len(str(month)) == 1:
                         month = '0' + str(month)
                     if len(str(day)) == 1:
@@ -66,15 +78,14 @@ class SportsAttribute():
                     url = NewsURL + str(year) + str(month) + str(day)
 
                     #끝페이지보다 더 큰 값을 이동하면 자동으로 마지막 페이지로 이동하게 된다.
-                    totalpage = NewsParser.findNewsTotalpageS(url+'&page=10000')
-                    for page in range(1,totalpage+1):
-                        madeURL.append(url+'&page='+str(page))
+                    totalpage = NewsParser.find_news_total_pageS(url + '&page=10000')
+                    for page in range(1, totalpage + 1):
+                        madeURL.append(url + '&page=' + str(page))
         return madeURL
 
-
     @classmethod
-    def fileWrite(self,fileName,title,content):
-        f = open(fileName,'w')
+    def fileWrite(self, file_name: str, title: str, content: str):
+        f = open(file_name,'w')
         f.write(title)
         f.write("\n")
         for c in content:
@@ -83,7 +94,7 @@ class SportsAttribute():
         f.close()
 
     @staticmethod
-    def getURLdata(url, max_tries=10):
+    def getURLdata(url: str, max_tries=10):
         remaining_tries = int(max_tries)
         while remaining_tries > 0:
             try:
@@ -93,78 +104,82 @@ class SportsAttribute():
             remaining_tries = remaining_tries - 1
         raise ResponseTimeout
 
-    def crawling(self,categoryName):
-        print(str(os.getpid())+" : "+categoryName+'\n')
-        url= "http://sports.news.naver.com/"+str(self.categoryCode.get(categoryName))+"/news/index.nhn?isphoto=N&date="
-        urls = self.makeNewsURLForm(url, self.date['startYear'], self.date['endYear'], self.date['startMonth'], self.date['endMonth']) 
+    def crawling(self, category_name: str):
+        print(str(os.getpid())+" : " + category_name + '\n')
+        url = "http://sports.news.naver.com/" + str(self.category_code.get(category_name)) + "/news/index.nhn?isphoto=N&date="
+        urls = self.make_newsURL_form(url, self.date['startYear'], self.date['endYear'], self.date['startMonth'], self.date['endMonth']) 
         number = 0
 
         print("Crawling Start!")
         for url in tqdm(urls):
-            print(str(os.getpid())+" : "+url)
-            options =webdriver.ChromeOptions()
-            options.add_argument('headless')
-            options.add_argument('disable-gpu')
-            driver = webdriver.Chrome(self.driverPath,chrome_options=options)
+            print(str(os.getpid()) + " : " + url)
+            driver = self.set_selenium_options()
             driver.implicitly_wait(2)
             driver.get(url)
             driver.implicitly_wait(2)
-            pages=driver.find_elements_by_css_selector('#_newsList > ul >li')
+            pages = driver.find_elements_by_css_selector('#_newsList > ul >li')
 
             articles=[]
             for page in pages:
                 articles.append(page.find_element_by_css_selector('a').get_attribute('href'))
             del pages
             driver.quit()
-            for contentURL in articles:
+            for content_URL in articles:
                 time.sleep(0.05)
 
-                contentHtml = self.getURLdata(contentURL)
-                documentContent = BeautifulSoup(contentHtml.content, 'html.parser')
+                content_html = self.getURLdata(content_URL)
+                document_content = BeautifulSoup(content_html.content, 'html.parser')
 
                 try:
                     # 기사 제목 가져옴
-                    articleTitle = documentContent.find_all('h4',{'class': 'title'})
+                    article_title = document_content.find_all('h4', {'class': 'title'})
                     title = ''  # 뉴스 기사 제목 초기화
-                    title += NewsParser.clearHeadline(str(articleTitle[0].find_all(text=True)))
+                    title += NewsParser.clear_headline(str(article_title[0].find_all(text=True)))
                     if not title:  # 공백일 경우 기사 제외 처리
                         continue
 
                     # 기사 본문 가져옴
-                    articleBodyContents = documentContent.find_all('div', {'id': 'newsEndContents'})
-                    content = NewsParser.clearContentS(list(articleBodyContents[0].find_all(text=True)))
+                    article_body_contents = document_content.find_all('div', {'id': 'newsEndContents'})
+                    content = NewsParser.clear_contentS(list(article_body_contents[0].find_all(text = True)))
                     if not len(content):  # 공백일 경우 기사 제외 처리
                         continue
 
                     try:
-                        if not(os.path.isdir(self.DATA_DIR)):
-                            os.makedirs(self.DATA_DIR)
+                        if not(os.path.isdir(DATA_DIR)):
+                            os.makedirs(DATA_DIR)
                             print("폴더 생성")
                     except OSError:
                         print("폴더 생성에 실패했습니다.")
 
 
-                    fileName = self.DATA_DIR+'/'+categoryName+str(number)+".txt"
-                    self.fileWrite(fileName,title,content)
-                    number+=1
+                    file_name = DATA_DIR+'/'+category_name+str(number)+".txt"
+                    self.fileWrite(file_name, title, content)
+                    number += 1
 
                     del content, title
-                    del articleTitle, articleBodyContents
-                    del contentHtml, documentContent
+                    del article_title, article_body_contents
+                    del content_html, document_content
 
                 except Exception:
-                    del contentHtml, documentContent
+                    del content_html, document_content
                     pass
 
+    def set_selenium_options(self):
+        options =webdriver.ChromeOptions()
+        options.add_argument('headless')
+        options.add_argument('disable-gpu')
+        options.add_experimental_option('excludeSwitches',['enable-logging'])
+        driver = webdriver.Chrome(DRIVER_PATH, chrome_options = options)
+        return driver
 
     def start(self):
-        for categoryName in self.selectedCategories:
-            proc = Process(target=self.crawling, args=(categoryName,))
+        for category_name in self.selected_categories:
+            proc = Process(target = self.crawling, args = (category_name,))
             proc.start()
 
 if __name__=='__main__':
     Crawler = SportsAttribute()
-    Crawler.setCategory("야구")
-    Crawler.setDate(2019, 11, 2019, 11)
+    Crawler.set_category("야구")
+    Crawler.set_date(args.startY, args.startM, args.endY, args.endM)
     Crawler.start()
 
