@@ -7,6 +7,7 @@ import time
 from typing import List
 
 from bs4 import BeautifulSoup
+import chromedriver_autoinstaller
 import requests
 from selenium import webdriver
 from tqdm import tqdm
@@ -57,7 +58,11 @@ class EntertainAttribute():
         options.add_argument('headless')
         options.add_argument('disable-gpu')
             #options.add_argument('--start-maximized')
-        driver = webdriver.Chrome(DRIVER_PATH, chrome_options = options)
+        try:
+            driver = webdriver.Chrome(DRIVER_PATH, chrome_options = options)
+        except:
+            path = chromedriver_autoinstaller.install()
+            driver = webdriver.Chrome(path, chrome_options = options)
         return driver
 
     @staticmethod

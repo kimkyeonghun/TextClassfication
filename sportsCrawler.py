@@ -7,6 +7,7 @@ import time
 from tqdm import tqdm
 from typing import List
 
+import chromedriver_autoinstaller
 from bs4 import BeautifulSoup
 import requests
 from selenium import webdriver
@@ -169,7 +170,12 @@ class SportsAttribute():
         options.add_argument('headless')
         options.add_argument('disable-gpu')
         options.add_experimental_option('excludeSwitches',['enable-logging'])
-        driver = webdriver.Chrome(DRIVER_PATH, chrome_options = options)
+        try:
+            driver = webdriver.Chrome(DRIVER_PATH, chrome_options = options)
+        except:
+            path = chromedriver_autoinstaller.install()
+            driver = webdriver.Chrome(path, chrome_options = options)
+
         return driver
 
     def start(self):
