@@ -7,12 +7,14 @@ class InvalidCategory(Exception):
     def __str__(self):
         return str(self.message)
 
+
 class OverFlowYear(Exception):
     def __init__(self):
         self.message = "시작연도는 종료연도를 넘을 수 없습니다."
 
     def __str__(self):
         return str(self.message)
+
 
 class InvalidMonth(Exception):
     def __init__(self):
@@ -21,6 +23,7 @@ class InvalidMonth(Exception):
     def __str__(self):
         return str(self.message)
 
+
 class OverFlowMonth(Exception):
     def __init__(self):
         self.message = "같은 해에서 시작달은 종료달을 넘을 수 없습니다."
@@ -28,12 +31,14 @@ class OverFlowMonth(Exception):
     def __str__(self):
         return str(self.message)
 
+
 class ResponseTimeout(Exception):
     def __init__(self):
         self.message = "URL을 받아올 수 없습니다."
 
     def __str__(self):
         return str(self.message)
+
 
 class UndefineTokenizer(Exception):
     def __init__(self):
