@@ -1,10 +1,12 @@
 import re
+import time
 
 from bs4 import BeautifulSoup
 import requests
 from selenium import webdriver
+import chromedriver_autoinstaller
 
-DRIVERT_PATH = './webdriver/chrome/chromedriver.exe'
+DRIVER_PATH = './webdriver/chrome/chromedriver.exe'
 
 
 class NewsParser(object):
@@ -40,14 +42,14 @@ class NewsParser(object):
     @classmethod
     def find_news_total_pageS(self, urlS):
         try:
-            driver = webdriver.Chrome(
-                DRIVERT_PATH, chrome_options=self.options)
+            path = chromedriver_autoinstaller.install()
+            driver = webdriver.Chrome(path, chrome_options=self.options)
             driver.implicitly_wait(5)
             driver.get(urlS)
             driver.implicitly_wait(5)
-            total_page = driver.find_element_by_css_selector(
-                '#_pageList > strong')
+            total_page = driver.find_element_by_css_selector('#_pageList > strong')
             total_page = int(total_page.text)
+            time.sleep(5)
             driver.quit()
             return total_page
         except Exception:
