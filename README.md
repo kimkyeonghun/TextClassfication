@@ -38,3 +38,8 @@ Beautifulsoup와 Selenium을 사용한 네이버 뉴스 기사 크롤러 및 cat
    - sportsCrawler.py
      - 파일 실행시 시작연도, 월, 종료연도, 월을 입력해야 합니다. -> NewsCralwer.py에만 적용
      - selenium을 사용해서 크롤링하기 때문에 selenium 설치가 필요합니다.
+
+
+## 2022년 추가 사항
+
+investing.com 홈페이지에서 각 종목별 기사들을 Crawling 하는 코드를 개발중에 있습니다.
