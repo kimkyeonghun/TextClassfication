@@ -53,8 +53,11 @@ for ticker in tickers:
             break
     # driver.get(href+"-news")
     page = 1
+    sleep(6)
+    driver.quit()
+    href = href+'-news'+"/"+str(page)
     while True:
-        req = requests.get(href+'-news'+"/"+str(page), headers = header)
+        req = requests.get(href, headers = header)
         sleep(0.5)
         if req.status_code==200:
             html = req.text
@@ -68,9 +71,14 @@ for ticker in tickers:
                 article_id = article['data-id']
                 infos = article.find('div',class_='textDiv')
                 news_href = infos.find('a')['href']
+                #Pro version 기사 skip
+                if news_href.startswith('/pro'):
+                    print(news_href)
+                    continue
                 news_title = infos.find('a')['title']
                 provider = infos.find('span').find('span').text
                 sleep(random.random())
+                #외부 사이트 이동하는 provider skip 필요
                 if provider in ['Seeking Alpha']:
                     continue
                 text, release_time = get_content(news_href, investing_url)
@@ -78,8 +86,6 @@ for ticker in tickers:
             page+=1
             try:
                 next = soup.find('div', class_='sideDiv inlineblock text_align_lang_base_2').find('a')['href']
-                if investing_url + next != href+'-news'+"/"+str(page):
-                    break
                 href = investing_url + next
             except:
                 print("No Next")
